@@ -15,7 +15,7 @@ Follow me on [X (Twitter)](https://x.com/dlordkendex) and tag **@dlordkendex** w
 Run this single command to download and start the Aztec node setup:
 
 ```bash
-[ -f "aztec.sh" ] && rm aztec.sh; curl -sSL -o aztec.sh https://raw.githubusercontent.com/martinc1991/aztec-node-startup/main/aztec.sh && chmod +x aztec.sh && ./aztec.sh
+[ -f "aztec.sh" ] && rm aztec.sh; curl -sSL -o aztec.sh https://raw.githubusercontent.com/martinc1991/aztec-node-startup/main/aztec/aztec.sh && chmod +x aztec.sh && ./aztec.sh
 ```
 
 That's it! The setup menu will launch automatically. 🎉
@@ -25,7 +25,7 @@ That's it! The setup menu will launch automatically. 🎉
 If you prefer a different menu interface, you can also use:
 
 ```bash
-[ -f "menu.sh" ] && rm menu.sh; curl -sSL -o menu.sh https://raw.githubusercontent.com/martinc1991/aztec-node-startup/main/menu.sh && chmod +x menu.sh && ./menu.sh
+[ -f "menu.sh" ] && rm menu.sh; curl -sSL -o menu.sh https://raw.githubusercontent.com/martinc1991/aztec-node-startup/main/scripts/menu.sh && chmod +x menu.sh && ./menu.sh
 ```
 
 ---
@@ -45,13 +45,13 @@ Deploy and run an Aztec sequencer validator node on **Ubuntu 20.04 or higher** u
 **Run the setup menu:**
 
 ```bash
-[ -f "aztec.sh" ] && rm aztec.sh; curl -sSL -o aztec.sh https://raw.githubusercontent.com/martinc1991/aztec-node-startup/main/aztec.sh && chmod +x aztec.sh && ./aztec.sh
+[ -f "aztec.sh" ] && rm aztec.sh; curl -sSL -o aztec.sh https://raw.githubusercontent.com/martinc1991/aztec-node-startup/main/aztec/aztec.sh && chmod +x aztec.sh && ./aztec.sh
 ```
 
 **Or use the alternative menu:**
 
 ```bash
-[ -f "menu.sh" ] && rm menu.sh; curl -sSL -o menu.sh https://raw.githubusercontent.com/martinc1991/aztec-node-startup/main/menu.sh && chmod +x menu.sh && ./menu.sh
+[ -f "menu.sh" ] && rm menu.sh; curl -sSL -o menu.sh https://raw.githubusercontent.com/martinc1991/aztec-node-startup/main/scripts/menu.sh && chmod +x menu.sh && ./menu.sh
 ```
 
 ### Menu Options:
