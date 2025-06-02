@@ -8,32 +8,55 @@ YELLOW="\033[1;33m"
 GREEN="\033[1;32m"
 RED="\033[1;31m"
 
-SCRIPT_DIR_ABS="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+# Additional colors from menu.sh
+readonly COLOR_RESET=$(tput sgr0)
+readonly COLOR_BOLD=$(tput bold)
+readonly COLOR_RED=$(tput setaf 1)
+readonly COLOR_GREEN=$(tput setaf 2)
+readonly COLOR_YELLOW=$(tput setaf 3)
+readonly COLOR_CYAN=$(tput setaf 6)
 
-import_scripts() {
-  local base_dir="$1"
-  shift
-  local scripts_to_import=("$@")
+# UI helpers from menu.sh
+info()    { echo -e "${COLOR_CYAN}${1}${COLOR_RESET}"; }
+success() { echo -e "${COLOR_GREEN}${1}${COLOR_RESET}"; }
+warning() { echo -e "${COLOR_YELLOW}${1}${COLOR_RESET}"; }
+error()   { echo -e "${COLOR_RED}${1}${COLOR_RESET}" >&2; }
 
-  for script_name in "${scripts_to_import[@]}"; do
-    # Find script file recursively inside base_dir
-    local found_file
-    found_file=$(find "$base_dir" -type f -name "$script_name" -print -quit)
-
-    if [[ -z "$found_file" ]]; then
-      echo "Error: Script '$script_name' not found in $base_dir" >&2
-      exit 1
-    fi
-
-    # Source the found script
-    if ! source "$found_file"; then
-      echo "Error: Failed to source '$found_file'" >&2
-      exit 1
-    fi
-  done
+pause() {
+  echo
+  read -rp "${COLOR_BOLD}${COLOR_GREEN} 🔙🔙 Back to main menu? << ${COLOR_RESET}"
 }
 
-import_scripts "$SCRIPT_DIR_ABS/../scripts" menu.sh
+# External hooks for menu system
+EXTRA_MENU_ITEMS=()
+EXTRA_MENU_FUNCTIONS=()
+
+register_menu_item() {
+  EXTRA_MENU_ITEMS+=("$1")         # e.g., "42) My Special Task"
+  EXTRA_MENU_FUNCTIONS+=("$2")     # e.g., "my_special_task"
+}
+
+invoke_extra_menu_function() {
+  local choice="$1"
+  for i in "${!EXTRA_MENU_ITEMS[@]}"; do
+    local item="${EXTRA_MENU_ITEMS[i]}"
+    local num="${item#[}"; num="${num%%]*}" # trim [ and ]
+    if [[ "$choice" == "$num" ]]; then
+      "${EXTRA_MENU_FUNCTIONS[i]}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+print_extra_menu_items() {
+  for item in "${EXTRA_MENU_ITEMS[@]}"; do
+    echo "  $item"
+  done
+  echo "${COLOR_RESET}"
+}
+
+SCRIPT_DIR_ABS="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 
 PROJECT_DIR=$SCRIPT_DIR_ABS
 ENV_FILE="$PROJECT_DIR/.env"
@@ -110,7 +133,6 @@ get_aztec_container_name() {
 register_menu_item "[10] Fetch L2 Block + Sync Proof" show_l2_block_and_sync_proof
 register_menu_item "[11] Retrieve Sequencer PeerId" get_sequencer_peer_id_from_logs
 register_menu_item "[12] Display Public IP Address" fetch_ip
-
 
 setup_compose_file() {
   cat >"$COMPOSE_FILE" <<EOF
@@ -211,10 +233,16 @@ stop_node() {
 }
 
 clean_up() {
-  cd "$PROJECT_DIR"
-  docker compose down -v
-  rm -rf ./data
-  echo -e "${GREEN}🚮 Node cleaned up successfully.${RESET}"
+  warning "Factory reset selected! This will delete all data."
+  read -rp "Are you sure? [y/N]: " confirm
+  if [[ "$confirm" =~ ^[Yy]$ ]]; then
+    cd "$PROJECT_DIR"
+    docker compose down -v
+    rm -rf ./data
+    success "Factory reset completed."
+  else
+    info "Factory reset cancelled."
+  fi
 }
 
 reload_env() {
@@ -320,8 +348,85 @@ healthcheck() {
   echo -e "${GREEN}✅ Health check completed${RESET}"
 }
 
-####################################################################################################
+show_help() {
+  echo -e "${COLOR_BOLD}${COLOR_CYAN}AZTEC NODE SETUP - HELP${COLOR_RESET}"
+  echo
+  echo -e "${COLOR_BOLD}${COLOR_CYAN}Available Options:${COLOR_RESET}${COLOR_YELLOW}"
+  echo "  [1] Install/Reinstall     - Install or reinstall the node."
+  echo "  [2] Edit .env file        - Open the .env configuration file."
+  echo "  [3] Start/Restart         - Start or restart the node process."
+  echo "  [4] View Logs             - Show real-time node logs."
+  echo "  [5] Status                - Check node status and health."
+  echo "  [6] Stop                  - Stop the running node."
+  echo "  [7] Shell                 - Open an interactive shell in the container."
+  echo "  [8] Help                  - Show this help information."
+  echo "  [RESET] Factory Reset     - Erase all data and reset to defaults."
+  echo "  [0] Exit                  - Exit the menu."
+  echo
+  echo -e "${COLOR_BOLD}${COLOR_CYAN}Extra Items:${COLOR_RESET}${COLOR_YELLOW}"
+  echo "  [10] Fetch L2 Block + Sync Proof  - Get latest L2 block and sync proof."
+  echo "  [11] Retrieve Sequencer PeerId     - Get sequencer peer ID from logs."
+  echo "  [12] Display Public IP Address     - Show server's public IP address."
+  echo
+  echo -e "${COLOR_BOLD}${COLOR_CYAN}Tips:${COLOR_RESET}${COLOR_YELLOW}"
+  echo "  - Use arrow keys or numbers to select options."
+  echo "  - Press Ctrl+C to quit logs view."
+  echo ${COLOR_RESET}
+}
 
+# Main menu function (integrated from menu.sh)
+main_menu() {
+  while true; do
+    clear
+    echo -e "${COLOR_CYAN}${COLOR_BOLD}"
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║                    👻 DLORD • AZTEC SETUP                    ║"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+
+    echo -e "${COLOR_CYAN}Choose an option:"
+    echo "  [1] Install/Reinstall"
+    echo "  [2] Edit .env file"
+    echo "  [3] Start/Restart"
+    echo "  [4] View Logs"
+    echo "  [5] Status"
+    echo "  [6] Stop"
+    echo "  [7] Shell"
+    echo "  [8] Help"
+    echo "  [RESET] Factory Reset"
+    echo "  [0] Exit ${COLOR_RESET}"
+
+    echo -e "${COLOR_YELLOW}${COLOR_BOLD}"; 
+    print_extra_menu_items
+    echo "${COLOR_RESET}"
+    
+    read -p "👉 Enter choice: " CHOICE
+
+    case "$CHOICE" in
+      1) install_reinstall ;;
+      2) edit_env ;;
+      3) start_restart ;;
+      4) view_logs ;;
+      5) node_status ;;
+      6) stop_node ;;
+      7) enter_container_shell ;;
+      8) show_help ;;
+      RESET) clean_up ;;
+      0)
+        echo -e "${COLOR_YELLOW}Goodbye.${COLOR_RESET}"
+        exit 0
+        ;;
+      *)
+        if ! invoke_extra_menu_function "$CHOICE"; then
+          error "Invalid option."
+        fi
+        ;;
+    esac
+
+    pause
+  done
+}
+
+####################################################################################################
 
 get_sequencer_peer_id_from_logs() {
   echo -e "\n${YELLOW}🆔 Retrieving sequencer PeerId..."
@@ -368,7 +473,6 @@ fetch_ip() {
 
   echo -e "📡 ${YELLOW}Detected server IP: ${GREEN}${BOLD}${ip}${RESET}"
 }
-
 
 ####################################################################################################
 
