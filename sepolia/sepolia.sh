@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
+# --- STYLES ---
 BOLD=$(tput bold)
 RESET=$(tput sgr0)
 CYAN="\033[1;36m"
@@ -8,63 +9,25 @@ YELLOW="\033[1;33m"
 GREEN="\033[1;32m"
 RED="\033[1;31m"
 
-SCRIPT_DIR_ABS="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-
-import_scripts() {
-  local base_dir="$1"
-  shift
-  local scripts_to_import=("$@")
-
-  for script_name in "${scripts_to_import[@]}"; do
-    # Find script file recursively inside base_dir
-    local found_file
-    found_file=$(find "$base_dir" -type f -name "$script_name" -print -quit)
-
-    if [[ -z "$found_file" ]]; then
-      echo "Error: Script '$script_name' not found in $base_dir" >&2
-      exit 1
-    fi
-
-    # Source the found script
-    if ! source "$found_file"; then
-      echo "Error: Failed to source '$found_file'" >&2
-      exit 1
-    fi
-  done
-}
-
-import_scripts "$SCRIPT_DIR_ABS/../scripts" menu.sh
-
-PROJECT_DIR=$SCRIPT_DIR_ABS
+# --- Configuration ---
+PROJECT_DIR="$(pwd)"
 ENV_FILE="$PROJECT_DIR/.env"
-AZTEC_DATA_DIR="$PROJECT_DIR/data/aztec"
 COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"
-USEFUL_PORTS="40400 8080"
+GETH_DATA_DIR="$PROJECT_DIR/data/geth"
+PRYSM_DATA_DIR="$PROJECT_DIR/data/prysm"
+JWT_FILE="$PROJECT_DIR/data/jwt/jwt.hex"
+USEFUL_PORTS="30303 6060 13000 9000"
 
 # Create directory structure
-mkdir -p "$PROJECT_DIR" "$AZTEC_DATA_DIR"
-## mkdir -p "$(dirname "$JWT_FILE")"
+mkdir -p "$PROJECT_DIR" "$GETH_DATA_DIR" "$PRYSM_DATA_DIR" "$(dirname "$JWT_FILE")"
+
 
 if [[ ! -f "$ENV_FILE" ]]; then
   # If the file does not exist, create and add content
   cat <<EOF >"$ENV_FILE"
 ## Press Ctrl+S to save, then Ctrl+X to exit
 #
-# Aztec Node Configuration
-# Refer to Aztec documentation for details on these variables.
-
-VALIDATOR_PRIVATE_KEY=
-VALIDATOR_PUBLIC_ADDRESS=
-P2P_IP=
-ETHEREUM_HOSTS=
-L1_CONSENSUS_HOST_URLS=
-
-# Default ports, can be overridden if necessary
-TCP_UDP_PORT=40400
-HTTP_PORT=8080
-
-#  Additional arguments, flags and options can be passed to the entrypoint
-EXTRA_ARGS=""
+#
 
 #
 #
@@ -78,50 +41,66 @@ fi
 
 
 
-# Register additional menu actions
-register_menu_item "[10] Fetch L2 Block + Sync Proof" show_l2_block_and_sync_proof
-register_menu_item "[11] Retrieve Sequencer PeerId" get_sequencer_peer_id_from_logs
-register_menu_item "[12] Display Public IP Address" fetch_ip
+CHOICE=""
+main_menu(){
+clear
+echo -e "${CYAN}${BOLD}"
+echo "╔══════════════════════════════════════════════════════════════╗"
+echo "║         👻 DLORD • SEPOLIA NODE - GETH + PRYSM SETUP         ║"
+echo "╚══════════════════════════════════════════════════════════════╝"
+echo -e "${RESET}"
 
 
-setup_compose_file() {
-  cat >"$COMPOSE_FILE" <<EOF
-services:
-  aztec:
-    image: aztecprotocol/aztec:alpha-testnet
-    container_name: aztec
-    environment:
-      ETHEREUM_HOSTS: "${ETHEREUM_HOSTS}"
-      L1_CONSENSUS_HOST_URLS: "${L1_CONSENSUS_HOST_URLS}"
-      DATA_DIRECTORY: "/data"
-      VALIDATOR_PRIVATE_KEY: "${VALIDATOR_PRIVATE_KEY}"
+echo -e "${CYAN}Choose an option:"
+echo "  [1] Install/Reinstall"
+echo "  [2] Edit .env file"
+echo "  [3] Start/Restart"
+echo "  [4] View Logs"
+echo "  [5] Status"
+echo "  [6] Stop"
+echo "  [7] Shell"
+echo "  [0] Exit"
+echo "  [RESET] Factory Reset${RESET}"
 
-      P2P_IP: "${P2P_IP}"
-      LOG_LEVEL: "info"
-      P2P_MAX_TX_POOL_SIZE: "1000000000"
-    entrypoint: >
-      sh -c 'node --no-warnings /usr/src/yarn-project/aztec/dest/bin/index.js start --network alpha-testnet start --node --archiver --sequencer  ${EXTRA_ARGS}'
-    ports:
-      - ${TCP_UDP_PORT}:40400/tcp
-      - ${TCP_UDP_PORT}:40400/udp
-      - ${HTTP_PORT}:8080
-    volumes:
-      - ${AZTEC_DATA_DIR}:/data
-    restart: unless-stopped
-EOF
+echo -e "${YELLOW}"
+echo "  [10] Run a checkup"
+echo "${RESET}"
+read -p "👉 Enter choice: " CHOICE
+
+case "$CHOICE" in
+  1) install_reinstall ;;
+  2) edit_env ;;
+  3) start_restart ;;
+  4) view_logs ;;
+  5) node_status ;;
+  6) stop_node ;;
+  7) enter_container_shell ;;
+  10) run_checkup ;;
+  0)
+    echo -e "${YELLOW}Goodbye.${RESET}"
+    exit 0
+    ;;
+   "RESET") clean_up ;;
+  *)
+    echo -e "${RED}Invalid option.${RESET}"
+    ;;
+esac
 }
 
+
+
 install_reinstall() {
-  read -p "Warning: This might Install newer version. Do you want to continue? [y/N]: " confirm
+  read -p "Warning: This will delete some data and volumes. Do you want to continue? [y/N]: " confirm
   [[ "$confirm" != [yY] ]] && echo "Cancelled." && return
 
   echo -e "${CYAN}Install/Reinstall started...${RESET}"
   install_dependencies
+  allow_ports $USEFUL_PORTS
+  setup_jwt
 
   cd "$PROJECT_DIR"
-  docker compose down
+  docker compose down -v
   docker compose build --no-cache
-  docker compose pull
   echo -e "${GREEN}✅ Install/Reinstall completed successfully!${RESET}"
 }
 
@@ -137,7 +116,7 @@ edit_env() {
 start_restart() {
   cd "$PROJECT_DIR"
   docker compose down
-  docker compose up -d --force-recreate
+  docker compose up -d
   echo -e "${GREEN}✅🔃 Node restarted successfully ${RESET}"
 }
 
@@ -221,6 +200,90 @@ enter_container_shell() {
   docker compose exec "$container" "$shell"
 }
 
+
+setup_compose_file() {
+    # Write Docker Compose file
+cat >"$COMPOSE_FILE" <<EOF
+services:
+  geth:
+    image: ethereum/client-go:stable
+    container_name: geth
+    command:
+      --sepolia
+      --syncmode=snap
+      --cache=12288
+      --cache.database=50
+      --cache.gc=15
+      --cache.snapshot=20
+      --cache.trie=15
+      --http
+      --http.port=8545
+      --http.addr=0.0.0.0
+      --http.vhosts=*
+      --http.api=eth,net,web3
+      --authrpc.port=8551
+      --authrpc.addr=0.0.0.0
+      --authrpc.vhosts=*
+      --authrpc.jwtsecret=/jwtsecret
+    volumes:
+      - ${GETH_DATA_DIR}:/root/.ethereum
+      - ${JWT_FILE}:/jwtsecret:ro
+    ports:
+      - 30303:30303
+      - 30303:30303/udp
+      - 8545:8545
+      - 8546:8546
+      - 8551:8551
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "1"
+    networks:
+      - sepolia_net
+
+  prysm:
+    image: prysmaticlabs/prysm-beacon-chain:stable
+    container_name: prysm
+    depends_on:
+      - geth
+    command:
+      --sepolia
+      --accept-terms-of-use
+      --datadir=/data
+      --disable-monitoring
+      --rpc-host=0.0.0.0
+      --execution-endpoint=http://geth:8551
+      --jwt-secret=/jwtsecret
+      --rpc-port=4000
+      --grpc-gateway-corsdomain=*
+      --grpc-gateway-host=0.0.0.0
+      --grpc-gateway-port=3500
+      --min-sync-peers=3
+      --beacon-db-pruning=true
+      --checkpoint-sync-url=https://beaconstate-sepolia.chainsafe.io
+      --genesis-beacon-api-url=https://beaconstate-sepolia.chainsafe.io
+    volumes:
+      - ${PRYSM_DATA_DIR}:/data
+      - ${JWT_FILE}:/jwtsecret:ro
+    ports:
+      - "3500:3500"
+      - "4000:4000"
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "2"
+    networks:
+      - sepolia_net
+networks:
+  sepolia_net:
+    driver: bridge
+EOF
+}
+
 install_dependencies() {
   echo -e "\n🔧 ${YELLOW}${BOLD}Setting up system dependencies...${RESET}"
 
@@ -251,51 +314,34 @@ install_dependencies() {
 }
 
 
+
 ####################################################################################################
 
-
-get_sequencer_peer_id_from_logs() {
-  echo -e "\n${YELLOW}🆔 Retrieving sequencer PeerId..."
-
-  local peer_id
-  peer_id=$(docker logs aztec 2>&1 | grep -i '"peerId"' | grep -o '"peerId":"[^"]*"' | cut -d'"' -f4 | head -n 1)
-
-  if [[ -n "$peer_id" ]]; then
-    echo -e "✅ Sequencer PeerId: ${BOLD}$peer_id${RESET}"
-  else
-    echo -e "❌ ${RED}PeerId not found in logs.${RESET}"
-  fi
+setup_jwt() {
+    if [ ! -f "$JWT_FILE" ]; then
+        echo -e "${YELLOW}Creating JWT secret...${RESET}"
+        openssl rand -hex 32 >"$JWT_FILE"
+    else
+        echo -e "${GREEN}JWT secret already exists. Skipping creation.${RESET}"
+    fi
 }
 
-show_l2_block_and_sync_proof() {
-  echo -e "\n🔍 ${YELLOW}Fetching latest L2 block info..."
-
-  BLOCK=$(curl -s -X POST -H 'Content-Type: application/json' \
-    -d '{"jsonrpc":"2.0","method":"node_getL2Tips","params":[],"id":67}' \
-    http://localhost:$HTTP_PORT | jq -r ".result.proven.number")
-
-  if [[ -z "$BLOCK" || "$BLOCK" == "null" ]]; then
-    echo -e "❌ ${RED}Failed to fetch block number.${RESET}"
-    return
-  fi
-
-  echo -e "✅ Current L2 Block Number: ${BOLD}$BLOCK${RESET}"
-  echo -e "\n🔍 ${CYAN}Computing Proof..."
-
-  PROOF=$(curl -s -X POST -H 'Content-Type: application/json' \
-    -d "{\"jsonrpc\":\"2.0\",\"method\":\"node_getArchiveSiblingPath\",\"params\":[\"$BLOCK\",\"$BLOCK\"],\"id\":67}" \
-    http://localhost:$HTTP_PORT | jq -r ".result")
-
-  echo -e "🔗 Sync Proof:\n$PROOF ${RESET}"
-
+allow_ports() {
+  for port in "$@"; do
+    for proto in tcp udp; do
+      if ! sudo ufw status | grep -q "$port/$proto"; then
+        echo "Allowing port $port/$proto..."
+        sudo ufw allow ${port}/${proto}
+      fi
+    done
+  done
+  sudo ufw --force enable
 }
 
-fetch_ip() {
-  local ip=$(curl -s https://ipinfo.io/ip)
-  ip=${ip:-127.0.0.1}
-
-  echo -e "📡 ${YELLOW}Detected server IP: ${GREEN}${BOLD}${ip}${RESET}"
+run_checkup() {
+  bash "$(dirname "$0")/checkup.sh"
 }
+
 
 
 ####################################################################################################
