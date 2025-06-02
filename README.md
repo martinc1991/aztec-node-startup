@@ -1,23 +1,28 @@
-# 🐺 Aztec Node Startup
+# Aztec-Setup
 
-A complete all-in-one setup script to deploy an **Aztec sequencer validator node** — giving you your own fully functional RPC endpoints.
+A complete all-in-one setup script to deploy an **Aztec sequencer validator node** — giving you your own fully functional RPC endpoint.
+
+_Can't afford a paid RPC or a powerful VPS right now?
+No worries — I'm happy to share access to my self-hosted Sepolia RPC for just $5. It's stable, fast, and perfect if you just need something that works._
 
 Need help or want more features added?  
-Feel free to open an issue or submit a pull request.
+Follow me on [X (Twitter)](https://x.com/dlordkendex) and tag **@dlordkendex** with your request.
 
 ---
 
-## 🚀 Quick Start (Remote Execution)
+## 🚀 Quick Start
 
-Run these commands directly on your server without cloning the repository:
-
-### 1. Setup and Install Dependencies
+Run this single command to download and start the Aztec node setup:
 
 ```bash
 [ -f "aztec.sh" ] && rm aztec.sh; curl -sSL -o aztec.sh https://raw.githubusercontent.com/martinc1991/aztec-node-startup/main/aztec.sh && chmod +x aztec.sh && ./aztec.sh
 ```
 
-### 2. Alternative Menu Interface
+That's it! The setup menu will launch automatically. 🎉
+
+### Alternative Menu Interface
+
+If you prefer a different menu interface, you can also use:
 
 ```bash
 [ -f "menu.sh" ] && rm menu.sh; curl -sSL -o menu.sh https://raw.githubusercontent.com/martinc1991/aztec-node-startup/main/menu.sh && chmod +x menu.sh && ./menu.sh
@@ -40,7 +45,13 @@ Deploy and run an Aztec sequencer validator node on **Ubuntu 20.04 or higher** u
 **Run the setup menu:**
 
 ```bash
-./aztec.sh
+[ -f "aztec.sh" ] && rm aztec.sh; curl -sSL -o aztec.sh https://raw.githubusercontent.com/martinc1991/aztec-node-startup/main/aztec.sh && chmod +x aztec.sh && ./aztec.sh
+```
+
+**Or use the alternative menu:**
+
+```bash
+[ -f "menu.sh" ] && rm menu.sh; curl -sSL -o menu.sh https://raw.githubusercontent.com/martinc1991/aztec-node-startup/main/menu.sh && chmod +x menu.sh && ./menu.sh
 ```
 
 ### Menu Options:
@@ -59,63 +70,3 @@ Deploy and run an Aztec sequencer validator node on **Ubuntu 20.04 or higher** u
 ### Need Help?
 
 Join the [Aztec Discord](https://discord.gg/aztecprotocol) — check the `#operators | starts-here` channel.
-
----
-
-## 📖 Quick Reference Commands
-
-### Remote Execution (Recommended)
-
-**Main setup script:**
-
-```bash
-[ -f "aztec.sh" ] && rm aztec.sh; curl -sSL -o aztec.sh https://raw.githubusercontent.com/martinc1991/aztec-node-startup/main/aztec.sh && chmod +x aztec.sh && ./aztec.sh
-```
-
-**Alternative menu:**
-
-```bash
-[ -f "menu.sh" ] && rm menu.sh; curl -sSL -o menu.sh https://raw.githubusercontent.com/martinc1991/aztec-node-startup/main/menu.sh && chmod +x menu.sh && ./menu.sh
-```
-
-### Manual Docker Commands
-
-**Check node logs:**
-
-```bash
-sudo docker logs -f --tail 100 $(docker ps -q --filter ancestor=aztecprotocol/aztec:latest | head -n 1)
-```
-
-**Stop all Aztec containers:**
-
-```bash
-sudo docker stop $(sudo docker ps -q --filter ancestor=aztecprotocol/aztec:latest)
-```
-
-**Remove Aztec containers:**
-
-```bash
-sudo docker rm $(sudo docker ps -a -q --filter ancestor=aztecprotocol/aztec:latest)
-```
-
----
-
-# What currently works for me
-
-# VPS Specs, Real Usage Example this is relatable.
-
-I currently run the **Aztec sequencer** on a VPS.
-
-### My VPS Specs:
-
-- 8 CPU cores
-- 30 GB RAM
-- 1.2 TB SSD
-
-### Active Resource Usage:
-
-- **CPU:** All 8 cores
-- **RAM:** ~8 GB used, ~22 GB free
-- **Storage:** ~700 GB used, ~500 GB free
-
-This real-world usage should help you decide what VPS setup best suits your needs and budget.

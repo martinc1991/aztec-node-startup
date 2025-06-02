@@ -1,7 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-# Terminal formatting constants
 BOLD=$(tput bold)
 RESET=$(tput sgr0)
 CYAN="\033[1;36m"
@@ -11,7 +10,6 @@ RED="\033[1;31m"
 
 SCRIPT_DIR_ABS="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 
-# Dynamic script importing function - recursively finds and sources scripts from a base directory
 import_scripts() {
   local base_dir="$1"
   shift
@@ -35,10 +33,8 @@ import_scripts() {
   done
 }
 
-# Import the menu system from the scripts directory
 import_scripts "$SCRIPT_DIR_ABS/../scripts" menu.sh
 
-# Project configuration paths and settings
 PROJECT_DIR=$SCRIPT_DIR_ABS
 ENV_FILE="$PROJECT_DIR/.env"
 AZTEC_DATA_DIR="$PROJECT_DIR/data/aztec"
@@ -47,9 +43,7 @@ USEFUL_PORTS="40400 8080"
 
 # Create directory structure
 mkdir -p "$PROJECT_DIR" "$AZTEC_DATA_DIR"
-## mkdir -p "$(dirname "$JWT_FILE")"
 
-# Initialize environment file with default configuration if it doesn't exist
 if [[ ! -f "$ENV_FILE" ]]; then
   # If the file does not exist, create and add content
   cat <<EOF >"$ENV_FILE"
@@ -77,17 +71,47 @@ EXTRA_ARGS=""
 EOF
 fi
 
-# Load environment variables if the file exists
 if [[ -f "$ENV_FILE" ]]; then
-  source $ENV_FILE
+  source "$ENV_FILE"
 fi
 
-# Register custom menu items for specialized Aztec operations
+# Validate required environment variables
+validate_env_vars() {
+  local missing_vars=()
+  
+  [[ -z "${VALIDATOR_PRIVATE_KEY:-}" ]] && missing_vars+=("VALIDATOR_PRIVATE_KEY")
+  [[ -z "${P2P_IP:-}" ]] && missing_vars+=("P2P_IP")
+  [[ -z "${ETHEREUM_HOSTS:-}" ]] && missing_vars+=("ETHEREUM_HOSTS")
+  [[ -z "${L1_CONSENSUS_HOST_URLS:-}" ]] && missing_vars+=("L1_CONSENSUS_HOST_URLS")
+  
+  if [[ ${#missing_vars[@]} -gt 0 ]]; then
+    echo -e "${RED}❌ Missing required environment variables:${RESET}"
+    printf '%s\n' "${missing_vars[@]}"
+    echo -e "${YELLOW}Please edit the .env file to set these variables.${RESET}"
+    return 1
+  fi
+  
+  return 0
+}
+
+# Get container name dynamically
+get_aztec_container_name() {
+  local container_name
+  container_name=$(docker compose ps --format "{{.Name}}" | grep -E "(aztec|node)" | head -n 1)
+  
+  if [[ -z "$container_name" ]]; then
+    echo "aztec"  # fallback to default name
+  else
+    echo "$container_name"
+  fi
+}
+
+# Register additional menu actions
 register_menu_item "[10] Fetch L2 Block + Sync Proof" show_l2_block_and_sync_proof
 register_menu_item "[11] Retrieve Sequencer PeerId" get_sequencer_peer_id_from_logs
 register_menu_item "[12] Display Public IP Address" fetch_ip
 
-# Generate Docker Compose configuration dynamically based on environment variables
+
 setup_compose_file() {
   cat >"$COMPOSE_FILE" <<EOF
 services:
@@ -115,7 +139,6 @@ services:
 EOF
 }
 
-# Full installation/reinstallation process with dependency management
 install_reinstall() {
   read -p "Warning: This might Install newer version. Do you want to continue? [y/N]: " confirm
   [[ "$confirm" != [yY] ]] && echo "Cancelled." && return
@@ -124,43 +147,42 @@ install_reinstall() {
   install_dependencies
 
   cd "$PROJECT_DIR"
-  # Clean rebuild to ensure latest versions
   docker compose down
   docker compose build --no-cache
   docker compose pull
   echo -e "${GREEN}✅ Install/Reinstall completed successfully!${RESET}"
 }
 
-# Interactive environment configuration editor
 edit_env() {
-  nano $ENV_FILE
-  # Reload the updated environment variables
+  nano "$ENV_FILE"
   if [[ -f "$ENV_FILE" ]]; then
-    source $ENV_FILE
+    source "$ENV_FILE"
   fi
-  # Regenerate compose file with new values
   setup_compose_file
   echo -e "${GREEN}✅ .env variables updated successfully!${RESET}"
 }
 
-# Clean restart of the Aztec node
 start_restart() {
+  # Validate environment variables before starting
+  if ! validate_env_vars; then
+    echo -e "${RED}❌ Cannot start node due to missing environment variables.${RESET}"
+    return 1
+  fi
+  
   cd "$PROJECT_DIR"
   docker compose down
   docker compose up -d --force-recreate
   echo -e "${GREEN}✅🔃 Node restarted successfully ${RESET}"
 }
 
-# Real-time log streaming
 view_logs() {
   echo -e "${CYAN}Streaming logs started (Ctrl+C to exit)...${RESET}"
   cd "$PROJECT_DIR"
   docker compose logs -f
 }
 
-# Interactive container status inspection
 node_status() {
-  list_runing_containers
+  list_running_containers
 
   echo -n "Enter a container, pick from the above list: "
   read -r container
@@ -170,7 +192,6 @@ node_status() {
     return 1
   fi
 
-  # Display comprehensive container status information
   echo -e "${CYAN}Docker container status:${RESET}"
   docker inspect -f \
 ' Name:  {{.Name}}
@@ -189,7 +210,6 @@ stop_node() {
   echo -e "${RED}🛑 Node stopped.${RESET}"
 }
 
-# Complete cleanup including data volumes
 clean_up() {
   cd "$PROJECT_DIR"
   docker compose down -v
@@ -197,23 +217,21 @@ clean_up() {
   echo -e "${GREEN}🚮 Node cleaned up successfully.${RESET}"
 }
 
-# Reload environment variables without restarting
 reload_env() {
   if [[ -f "$ENV_FILE" ]]; then
-    source $ENV_FILE
+    source "$ENV_FILE"
   fi
 }
 
-list_runing_containers() {
+list_running_containers() {
   cd "$PROJECT_DIR"
   echo "List of running containers in this project (empty if none):"
   docker compose ps --format "{{.Name}}"
 }
 
-# Interactive shell access to containers with automatic shell detection
 enter_container_shell() {
   cd "$PROJECT_DIR"
-  list_runing_containers
+  list_running_containers
 
   echo -n "Enter a container, pick from the above list: "
   read -r container
@@ -223,7 +241,6 @@ enter_container_shell() {
     return 1
   fi
 
-  # Detect available shell (bash preferred, fallback to sh)
   local shell
 
   if docker exec "$container" test -x /bin/bash; then
@@ -238,31 +255,25 @@ enter_container_shell() {
   docker compose exec "$container" "$shell"
 }
 
-# System dependencies installation including Docker setup
 install_dependencies() {
   echo -e "\n🔧 ${YELLOW}${BOLD}Setting up system dependencies...${RESET}"
 
   sudo apt update > /dev/null 2>&1
   sudo apt install -y -qq --no-upgrade curl jq git ufw apt-transport-https ca-certificates software-properties-common gnupg lsb-release
 
-  # Docker installation with proper repository setup
   if ! command -v docker &> /dev/null; then
     echo "Docker not found. Installing Docker..."
 
-    # Clean up any existing containerd installations
     sudo apt-get remove -y containerd || true
     sudo apt-get purge -y containerd || true
 
-    # Add Docker's official GPG key and repository
     sudo mkdir -p /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-    # Install Docker with compose plugin
     sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-    # Configure Docker service and user permissions
     sudo systemctl enable docker
     sudo systemctl start docker
     sudo usermod -aG docker "$USER"
@@ -273,16 +284,53 @@ install_dependencies() {
   fi
 }
 
+# Health check function
+healthcheck() {
+  echo -e "${CYAN}🔍 Performing health check...${RESET}"
+  
+  # Check if Docker is running
+  if ! docker info >/dev/null 2>&1; then
+    echo -e "${RED}❌ Docker is not running${RESET}"
+    return 1
+  fi
+  
+  # Check if compose file exists
+  if [[ ! -f "$COMPOSE_FILE" ]]; then
+    echo -e "${RED}❌ Docker compose file not found${RESET}"
+    return 1
+  fi
+  
+  # Check if container is running
+  local container_name
+  container_name=$(get_aztec_container_name)
+  
+  if docker ps --format "{{.Names}}" | grep -q "^${container_name}$"; then
+    echo -e "${GREEN}✅ Container '${container_name}' is running${RESET}"
+    
+    # Check if HTTP port is responding
+    if curl -s -f "http://localhost:${HTTP_PORT:-8080}" >/dev/null 2>&1; then
+      echo -e "${GREEN}✅ HTTP endpoint is responding${RESET}"
+    else
+      echo -e "${YELLOW}⚠️  HTTP endpoint not responding${RESET}"
+    fi
+  else
+    echo -e "${RED}❌ Container '${container_name}' is not running${RESET}"
+  fi
+  
+  echo -e "${GREEN}✅ Health check completed${RESET}"
+}
 
 ####################################################################################################
-# Aztec-specific utility functions
 
-# Extract sequencer peer ID from container logs
+
 get_sequencer_peer_id_from_logs() {
   echo -e "\n${YELLOW}🆔 Retrieving sequencer PeerId..."
 
+  local container_name
+  container_name=$(get_aztec_container_name)
+  
   local peer_id
-  peer_id=$(docker logs aztec 2>&1 | grep -i '"peerId"' | grep -o '"peerId":"[^"]*"' | cut -d'"' -f4 | head -n 1)
+  peer_id=$(docker logs "$container_name" 2>&1 | grep -i '"peerId"' | grep -o '"peerId":"[^"]*"' | cut -d'"' -f4 | head -n 1)
 
   if [[ -n "$peer_id" ]]; then
     echo -e "✅ Sequencer PeerId: ${BOLD}$peer_id${RESET}"
@@ -291,11 +339,9 @@ get_sequencer_peer_id_from_logs() {
   fi
 }
 
-# Fetch latest L2 block information and generate sync proof
 show_l2_block_and_sync_proof() {
   echo -e "\n🔍 ${YELLOW}Fetching latest L2 block info..."
 
-  # Query the node for the latest proven block number
   BLOCK=$(curl -s -X POST -H 'Content-Type: application/json' \
     -d '{"jsonrpc":"2.0","method":"node_getL2Tips","params":[],"id":67}' \
     http://localhost:$HTTP_PORT | jq -r ".result.proven.number")
@@ -308,7 +354,6 @@ show_l2_block_and_sync_proof() {
   echo -e "✅ Current L2 Block Number: ${BOLD}$BLOCK${RESET}"
   echo -e "\n🔍 ${CYAN}Computing Proof..."
 
-  # Generate archive sibling path proof for the current block
   PROOF=$(curl -s -X POST -H 'Content-Type: application/json' \
     -d "{\"jsonrpc\":\"2.0\",\"method\":\"node_getArchiveSiblingPath\",\"params\":[\"$BLOCK\",\"$BLOCK\"],\"id\":67}" \
     http://localhost:$HTTP_PORT | jq -r ".result")
@@ -317,7 +362,6 @@ show_l2_block_and_sync_proof() {
 
 }
 
-# Detect and display public IP address
 fetch_ip() {
   local ip=$(curl -s https://ipinfo.io/ip)
   ip=${ip:-127.0.0.1}
@@ -327,7 +371,6 @@ fetch_ip() {
 
 
 ####################################################################################################
-# Command line argument processing
 
 # Flags and options router 
 for arg in "$@"; do
