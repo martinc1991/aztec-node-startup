@@ -1,4 +1,4 @@
-# 🐺 Your Aztec Node Startup
+# 🐺 Aztec Node Startup
 
 A complete all-in-one setup script to deploy an **Aztec sequencer validator node** — giving you your own fully functional RPC endpoints.
 
@@ -7,21 +7,20 @@ Feel free to open an issue or submit a pull request.
 
 ---
 
-## Clone the Setup Repository
+## 🚀 Quick Start (Remote Execution)
 
-Run the following in your terminal to clone this setup script:
+Run these commands directly on your server without cloning the repository:
+
+### 1. Setup and Install Dependencies
 
 ```bash
-git clone https://github.com/martinc1991/aztec-node-startup.git && chmod +x aztec-node-startup/aztec/aztec.sh && cd aztec-node-startup
+[ -f "aztec.sh" ] && rm aztec.sh; curl -sSL -o aztec.sh https://raw.githubusercontent.com/martinc1991/aztec-node-startup/main/aztec.sh && chmod +x aztec.sh && ./aztec.sh
 ```
 
-### Directory Structure:
+### 2. Alternative Menu Interface
 
-```
-aztec-node-startup/
-├── aztec/
-│   └── aztec.sh
-└── scripts/
+```bash
+[ -f "menu.sh" ] && rm menu.sh; curl -sSL -o menu.sh https://raw.githubusercontent.com/martinc1991/aztec-node-startup/main/menu.sh && chmod +x menu.sh && ./menu.sh
 ```
 
 ---
@@ -38,16 +37,11 @@ Deploy and run an Aztec sequencer validator node on **Ubuntu 20.04 or higher** u
 
 ### Get Started:
 
-1. **Enter the Aztec directory:**
+**Run the setup menu:**
 
-   ```bash
-   cd aztec
-   ```
-
-2. **Run the setup menu:**
-   ```bash
-   ./aztec.sh
-   ```
+```bash
+./aztec.sh
+```
 
 ### Menu Options:
 
@@ -65,6 +59,44 @@ Deploy and run an Aztec sequencer validator node on **Ubuntu 20.04 or higher** u
 ### Need Help?
 
 Join the [Aztec Discord](https://discord.gg/aztecprotocol) — check the `#operators | starts-here` channel.
+
+---
+
+## 📖 Quick Reference Commands
+
+### Remote Execution (Recommended)
+
+**Main setup script:**
+
+```bash
+[ -f "aztec.sh" ] && rm aztec.sh; curl -sSL -o aztec.sh https://raw.githubusercontent.com/martinc1991/aztec-node-startup/main/aztec.sh && chmod +x aztec.sh && ./aztec.sh
+```
+
+**Alternative menu:**
+
+```bash
+[ -f "menu.sh" ] && rm menu.sh; curl -sSL -o menu.sh https://raw.githubusercontent.com/martinc1991/aztec-node-startup/main/menu.sh && chmod +x menu.sh && ./menu.sh
+```
+
+### Manual Docker Commands
+
+**Check node logs:**
+
+```bash
+sudo docker logs -f --tail 100 $(docker ps -q --filter ancestor=aztecprotocol/aztec:latest | head -n 1)
+```
+
+**Stop all Aztec containers:**
+
+```bash
+sudo docker stop $(sudo docker ps -q --filter ancestor=aztecprotocol/aztec:latest)
+```
+
+**Remove Aztec containers:**
+
+```bash
+sudo docker rm $(sudo docker ps -a -q --filter ancestor=aztecprotocol/aztec:latest)
+```
 
 ---
 
